@@ -1,0 +1,64 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: wallstreetbets
+  labels:
+    app: wallstreetbets
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: wallstreetbets
+  template:
+    metadata:
+      labels:
+        app: wallstreetbets
+    spec:
+      volumes: []
+      containers:
+      - name: main
+        image: wallstreetbets:latest
+        imagePullPolicy: IfNotPresent
+        command: ["/var/lib/wkndr/release/wkndr.mruby", "--server=/var/lib/wkndr/public", "--no-client"]
+        ports:
+        - containerPort: 8000
+        resources:
+          limits:
+            memory: 1024M
+            cpu: 100m
+          requests:
+            memory: 100M
+            cpu: 100m
+        volumeMounts: []
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: wallstreetbets-service
+spec:
+  type: NodePort
+  selector:
+    app: wallstreetbets
+  ports:
+  - protocol: TCP
+    name: app
+    port: 8000
+    nodePort: 32641
+
+---
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: wallstreetbets-vhost
+  annotations:
+    ingress.class: wkndr
+spec:
+  rules:
+  - host: stonks.bardin.haus
+    http:
+      paths:
+      - backend:
+          serviceName: wallstreetbets-service
+          servicePort: 8000

@@ -1,0 +1,115 @@
+#
+
+class StonkComponent
+  def initialize
+  end
+end
+
+class FenceSystem
+  def initialize(store)
+    @store = store
+    @selector = store.watch(PositionComponent, VelocityComponent)
+  end
+
+  def process(gt, dt, sw, sh)
+    @selector.each { |e, p, v|
+      if p.x < 0
+        p.x = 0
+        v.invertX
+      end
+
+      if p.x > sw
+        p.x = sw
+        v.invertX
+      end
+
+      if p.y < 0
+        p.y = 0
+        v.invertY
+      end
+
+      if p.y > sh
+        p.y = sh
+        v.invertY
+      end
+    }
+  end
+end
+
+Wkndr.nonce {
+  Wkndr.client_side { |gl|
+    gl.open_default_view!
+
+    @store = StorageManager.new
+    @fence = FenceSystem.new(@store)
+    @movement = MovementSystem.new(@store)
+    @diamond = SpriteComponent.new("resources/diamondhands.png")
+    @good_stock = SpriteComponent.new("resources/gme.png")
+
+    @spawn_proc = Proc.new { |x, y|
+      8.times {
+        @store.add(
+          StonkComponent.new,
+          PositionComponent.new(x - 64, y - 32, 0),
+          VelocityComponent.from_angle(rand * 2.0 * 3.14).mul((rand * 300.0) + 50.0),
+          (rand > 0.99) ? @diamond : @good_stock,
+          RandomColorComponent.new
+        )
+      }
+    }
+    
+    @stonks = @store.watch(PositionComponent, SpriteComponent, RandomColorComponent)
+  }
+}
+
+Wkndr.client_side { |gl|
+  gl.update { |global_time, delta_time, sw, sh|
+    gl.mousep { |xyl|
+      x, y, l = *xyl
+      if (l == 1)
+        spawn_proc_args = [
+          x,
+          y
+        ]
+        @spawn_proc.call(*spawn_proc_args)
+      end
+    }
+
+    gl.drawmode {
+      gl.twod {
+        @stonks.each { |e, p, s, c|
+          gl.draw_texture(s, p.x, p.y, p.z, *c.color)
+        }
+
+        gl.label("CLICK TO BUY AND HOLD: %d @ $%f ... I LIKE THESE STONKS" % [@stonks.length, @stonks.length * (10.0  * global_time)])
+      }
+    }
+
+    @fence.process(global_time, delta_time, sw, sh)
+    @movement.process(global_time, delta_time)
+  }
+}
+
+
+Wkndr.server_side { |gl, server|
+  server.wsb("/") do |cn, phr|
+  end
+
+  server.raw("/status") do |cn, phr|
+    Protocol.ok("ONLINE\n")
+  end
+
+  server.raw("/about") do |cn, phr|
+    mab = Markaby::Builder.new
+    mab.html5 "lang" => "en" do
+      mab.head do
+        mab.title "about"
+      end
+
+      mab.body do
+        mab.h1 "buy and hold stonks you like"
+      end
+    end
+    Protocol.ok(mab.to_s)
+  end
+}
