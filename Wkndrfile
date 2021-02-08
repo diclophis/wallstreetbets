@@ -87,15 +87,7 @@ Wkndr.client_side { |gl|
   gl.update { |global_time, delta_time, sw, sh|
     gl.mousep { |xyl|
       x, y, l = *xyl
-
-      spawn_proc_args = [
-        x,
-        y,
-        l
-      ]
-
-      @spawn_proc.call(*spawn_proc_args)
-      #gl.emit({"spawn" => spawn_proc_args})
+      @spawn_proc.call(x, y, l)
     }
 
     gl.drawmode {
