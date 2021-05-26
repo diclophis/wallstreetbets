@@ -16,6 +16,12 @@ end
 class DiamondHandComponent < GoodStonkComponent
 end
 
+class GoodStonkComponent < StonkComponent
+end
+
+class DiamondHandComponent < GoodStonkComponent
+end
+
 class FenceSystem
   def initialize(store)
     @store = store
@@ -60,11 +66,11 @@ Wkndr.nonce {
 
     @spawn_proc = Proc.new { |x, y, l|
       if (l == 1)
-        8.times {
+        4.times {
           @store.add(
             (rand > 0.999) ? DiamondHandComponent.new(@diamond) : GoodStonkComponent.new(@good_stonk),
             PositionComponent.new(x - 64, y - 32, 0),
-            VelocityComponent.from_angle(rand * 2.0 * 3.14).mul((rand * 300.0) + 50.0),
+            VelocityComponent.from_angle(rand * 2.0 * 3.14).mul((rand * 500.0) + 100.0),
             RandomColorComponent.new
           )
         }
@@ -115,6 +121,10 @@ Wkndr.client_side { |gl|
 
     @fence.process(global_time, delta_time, sw, sh)
     @movement.process(global_time, delta_time)
+
+    while @good_stonks.length > 64
+      @good_stonks.shift
+    end
   }
 }
 
