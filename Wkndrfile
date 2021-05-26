@@ -1,8 +1,19 @@
 # vi:syntax=ruby
 
 class StonkComponent
-  def initialize
+  def initialize(sprite)
+    @sprite = sprite
   end
+
+  def sprite
+    @sprite
+  end
+end
+
+class GoodStonkComponent < StonkComponent
+end
+
+class DiamondHandComponent < GoodStonkComponent
 end
 
 class FenceSystem
@@ -39,49 +50,66 @@ end
 Wkndr.nonce {
   Wkndr.client_side { |gl|
     gl.open_default_view!
+    gl.lookat(1, 45.0, 33.0, 45.0, 0.0, 0.1, 0.0, 40.0)
 
     @store = StorageManager.new
     @fence = FenceSystem.new(@store)
     @movement = MovementSystem.new(@store)
     @diamond = SpriteComponent.new("resources/diamondhands.png")
-    @good_stock = SpriteComponent.new("resources/gme.png")
+    @good_stonk = SpriteComponent.new("resources/gme.png")
 
-    @spawn_proc = Proc.new { |x, y|
-      8.times {
-        @store.add(
-          StonkComponent.new,
-          PositionComponent.new(x - 64, y - 32, 0),
-          VelocityComponent.from_angle(rand * 2.0 * 3.14).mul((rand * 300.0) + 50.0),
-          (rand > 0.99) ? @diamond : @good_stock,
-          RandomColorComponent.new
-        )
-      }
+    @spawn_proc = Proc.new { |x, y, l|
+      if (l == 1)
+        8.times {
+          @store.add(
+            (rand > 0.999) ? DiamondHandComponent.new(@diamond) : GoodStonkComponent.new(@good_stonk),
+            PositionComponent.new(x - 64, y - 32, 0),
+            VelocityComponent.from_angle(rand * 2.0 * 3.14).mul((rand * 300.0) + 50.0),
+            RandomColorComponent.new
+          )
+        }
+      end
     }
     
-    @stonks = @store.watch(PositionComponent, SpriteComponent, RandomColorComponent)
+    @good_stonks = @store.watch(GoodStonkComponent, PositionComponent, RandomColorComponent)
+    @diamond_hands = @store.watch(DiamondHandComponent, PositionComponent, RandomColorComponent)
   }
 }
 
 Wkndr.client_side { |gl|
+  gl.event { |channel, msg|
+    case channel
+      when "spawn"
+        @spawn_proc.call(*msg) if (@spawn_proc && @store)
+    end
+  }
+
   gl.update { |global_time, delta_time, sw, sh|
     gl.mousep { |xyl|
       x, y, l = *xyl
-      if (l == 1)
-        spawn_proc_args = [
-          x,
-          y
-        ]
-        @spawn_proc.call(*spawn_proc_args)
-      end
+
+      spawn_proc_args = [
+        x,
+        y,
+        l
+      ]
+
+      @spawn_proc.call(*spawn_proc_args)
+      gl.emit({"spawn" => spawn_proc_args})
     }
 
     gl.drawmode {
       gl.twod {
-        @stonks.each { |e, p, s, c|
-          gl.draw_texture(s, p.x, p.y, p.z, *c.color)
+        @good_stonks.each { |e, stonk, p, c|
+          gl.draw_texture(stonk.sprite, p.x, p.y, p.z, *c.color)
         }
 
-        gl.label("CLICK TO BUY AND HOLD: %d @ $%f ... I LIKE THESE STONKS" % [@stonks.length, @stonks.length * (10.0  * global_time)])
+        @diamond_hands.each { |e, stonk, p, c|
+          gl.draw_texture(stonk.sprite, p.x, p.y, p.z, *c.color)
+        }
+
+        msg = (@diamond_hands.length > 0) ? ("KEEP HOLDING!") : ((@good_stonks.length > 0) ? "HOLD FOR DIAMONDS" : "CLICK TO BUY")
+        gl.label("#{msg}: diamond hands: %d @ $%f ... I LIKE THESE STONKS" % [@diamond_hands.length, @good_stonks.length * (10.0  * global_time)])
       }
     }
 
